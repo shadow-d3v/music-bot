@@ -47,18 +47,24 @@ function getDB() {
 
 // ---------- KEYBOARD ----------
 function getKeyboard(page = 0) {
-    const db = getDB();
+    const db = loadDB(); // بدون reverse
 
     const start = page * PAGE_SIZE;
     const end = start + PAGE_SIZE;
 
-    const items = db.slice(start, end);
+    const reversed = db.slice().reverse(); // فقط برای نمایش
+
+    const items = reversed.slice(start, end);
 
     const buttons = [];
 
     for (let i = 0; i < items.length; i++) {
+
+        // تبدیل index درست به DB اصلی
+        const realIndex = db.length - 1 - (start + i);
+
         buttons.push([
-            Markup.button.callback(items[i].title, `song_${start + i}`)
+            Markup.button.callback(items[i].title, `song_${realIndex}`)
         ]);
     }
 
