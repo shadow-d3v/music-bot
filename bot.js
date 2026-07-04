@@ -32,20 +32,20 @@ async function isMember(userId) {
             userId
         );
 
-        return (
-            res.status === "member" ||
-            res.status === "administrator" ||
-            res.status === "creator"
-        );
-    } catch {
+        return ["member", "administrator", "creator", "restricted"].includes(res.status);
+
+    } catch (err) {
+        console.log("member check error:", err.message);
         return false;
     }
 }
 
-// ---------- KEYBOARD ----------
+// ---------- DB helper ----------
 function getDB() {
     return loadDB().slice().reverse();
 }
+
+// ---------- KEYBOARD ----------
 function getKeyboard(page = 0) {
     const db = getDB();
 
@@ -84,14 +84,9 @@ function getKeyboard(page = 0) {
 // ---------- START ----------
 bot.start(async (ctx) => {
 
-    const ok = await isMember(ctx.from.id);
-
-    if (!ok) {
+    if (!(await isMember(ctx.from.id))) {
         return ctx.reply(
-            `⚠️ برای استفاده از ربات باید عضو کانال باشید:
-
-👉 ${CHANNEL_USERNAME}`,
-
+            `⚠️ برای استفاده از ربات باید عضو کانال باشید:\n\n👉 ${CHANNEL_USERNAME}`,
             Markup.inlineKeyboard([
                 [
                     Markup.button.url(
@@ -106,53 +101,36 @@ bot.start(async (ctx) => {
         );
     }
 
-    // welcome text with pic
     await ctx.replyWithPhoto(
         "https://t.me/PainxSorrow/455",
         {
-            caption: `🎵 خوش آمدی!
-
-به ربات shadow خوش اومدی 🕊️
-
-👇 از لیست زیر آهنگ انتخاب کن`
+            caption: `🎵 خوش آمدی!\n\n👇 از لیست زیر آهنگ انتخاب کن`
         }
     );
 
     await ctx.reply("🎵 لیست آهنگ‌ها", getKeyboard(0));
 });
 
-// ---------- CHECK BUTTON ----------
+// ---------- CHECK ----------
 bot.action("check", async (ctx) => {
-    const ok = await isMember(ctx.from.id);
-
-    if (!ok) {
-        return ctx.answerCbQuery("⚠️ هنوز عضو کانال نشدی");
+    if (!(await isMember(ctx.from.id))) {
+        return ctx.answerCbQuery("❌ هنوز عضو نیستی");
     }
 
     await ctx.editMessageText(
-        `🎵 خوش آمدی!
-
-👇 از لیست زیر آهنگ انتخاب کن`,
+        "🎵 خوش آمدی!\n\n👇 لیست آهنگ‌ها",
         getKeyboard(0)
     );
 
-    await ctx.answerCbQuery("✅ تایید شد");
+    ctx.answerCbQuery("✅ تایید شد");
 });
 
 // ---------- HELP ----------
 bot.command("help", async (ctx) => {
+    if (!(await isMember(ctx.from.id)))
+        return ctx.reply("⚠️ اول عضو کانال شو");
 
-    const ok = await isMember(ctx.from.id);
-    if (!ok) return ctx.reply("⚠️ اول باید عضو کانال بشی");
-
-    await ctx.reply(
-        `📌 راهنما:
-
-🎵 انتخاب آهنگ
-🎲 آهنگ شانسی
-
-👑 فقط ادمین آهنگ اضافه می‌کند`
-    );
+    ctx.reply(`📌 راهنما:\n\n🎵 انتخاب آهنگ\n🎲 آهنگ شانسی`);
 });
 
 // ---------- ADD SONG (ADMIN ONLY) ----------
@@ -171,7 +149,12 @@ bot.on("message", async (ctx) => {
 
     if (!isMusic) return;
 
-    const db = loadDB();
+    const fileId =
+        msg.audio?.file_id ||
+        msg.document?.file_id ||
+        msg.voice?.file_id ||
+        msg.video?.file_id ||
+        msg.video_note?.file_id;
 
     const title =
         msg.caption ||
@@ -179,21 +162,61 @@ bot.on("message", async (ctx) => {
         msg.document?.file_name ||
         (msg.voice ? "🎤 ویس" : "🎵 بدون عنوان");
 
+    const db = loadDB();
+
     db.unshift({
         title,
-        messageId: msg.message_id
+        fileId
     });
 
     saveDB(db);
 
-    await ctx.reply("👌 آهنگ ذخیره شد");
+    ctx.reply("👌 آهنگ ذخیره شد");
+});
+
+// ---------- PLAY SONG ----------
+bot.action(/^song_(\d+)$/, async (ctx) => {
+
+    if (!(await isMember(ctx.from.id)))
+        return ctx.answerCbQuery("❌ عضو نیستی");
+
+    const db = getDB();
+    const song = db[Number(ctx.match[1])];
+
+    if (!song) return ctx.answerCbQuery("یافت نشد");
+
+    await ctx.telegram.sendDocument(
+        ctx.chat.id,
+        song.fileId
+    );
+
+    ctx.answerCbQuery();
+});
+
+// ---------- RANDOM ----------
+bot.action("random", async (ctx) => {
+
+    if (!(await isMember(ctx.from.id)))
+        return ctx.answerCbQuery("❌ عضو نیستی");
+
+    const db = loadDB();
+    if (!db.length) return ctx.answerCbQuery("خالیه");
+
+    const song = db[Math.floor(Math.random() * db.length)];
+
+    await ctx.telegram.sendDocument(
+        ctx.chat.id,
+        song.fileId
+    );
+
+    ctx.answerCbQuery("🎲");
 });
 
 // ---------- PAGINATION ----------
 bot.action(/^page_(\d+)$/, async (ctx) => {
 
-    const ok = await isMember(ctx.from.id);
-    if (!ok) return ctx.answerCbQuery("❌ عضو کانال نیستی");
+    if (!(await isMember(ctx.from.id)))
+        return ctx.answerCbQuery("❌ عضو نیستی");
 
     const page = Number(ctx.match[1]);
 
@@ -201,47 +224,7 @@ bot.action(/^page_(\d+)$/, async (ctx) => {
         getKeyboard(page).reply_markup
     );
 
-    await ctx.answerCbQuery();
-});
-
-// ---------- PLAY SONG ----------
-bot.action(/^song_(\d+)$/, async (ctx) => {
-
-    const ok = await isMember(ctx.from.id);
-    if (!ok) return ctx.answerCbQuery("❌ عضو کانال نیستی");
-
-    const db = getDB();
-    const song = db[Number(ctx.match[1])];
-
-    if (!song) return ctx.answerCbQuery("یافت نشد");
-
-    await ctx.telegram.copyMessage(
-        ctx.chat.id,
-        ctx.chat.id,
-        song.messageId
-    );
-
-    await ctx.answerCbQuery();
-});
-
-// ---------- RANDOM ----------
-bot.action("random", async (ctx) => {
-
-    const ok = await isMember(ctx.from.id);
-    if (!ok) return ctx.answerCbQuery("❌ عضو کانال نیستی");
-
-    const db = loadDB();
-    if (!db.length) return ctx.answerCbQuery("خالیه");
-
-    const song = db[Math.floor(Math.random() * db.length)];
-
-    await ctx.telegram.copyMessage(
-        ctx.chat.id,
-        ctx.chat.id,
-        song.messageId
-    );
-
-    await ctx.answerCbQuery("🎲");
+    ctx.answerCbQuery();
 });
 
 // ---------- ERROR ----------
@@ -249,4 +232,4 @@ bot.catch(console.error);
 
 bot.launch();
 
-console.log("✅ Music Bot Running (FORCE JOIN VERSION)");
+console.log("✅ Music Bot Running (FINAL VERSION)");
