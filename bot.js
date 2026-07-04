@@ -44,10 +44,11 @@ async function isMember(userId) {
 function getKeyboard(page = 0) {
     const db = loadDB();
 
+    const db = loadDB().slice().reverse();
+
     const start = page * PAGE_SIZE;
     const end = start + PAGE_SIZE;
-
-    const items = db.slice().reverse().slice(start, end);
+    const items = db.slice(start, end);
 
     const buttons = [];
 
