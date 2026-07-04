@@ -1,7 +1,7 @@
 import { Telegraf, Markup } from "telegraf";
 import fs from "fs";
 
-const bot = new Telegraf("8775753260:AAHmXSJMYRzYrDSSYkZrJT4Tk71yOcFHTD8");
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // 👑 ادمین
 const ADMIN_ID = 6364932669;
