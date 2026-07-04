@@ -174,7 +174,7 @@ bot.on("message", async (ctx) => {
         msg.document?.file_name ||
         (msg.voice ? "🎤 ویس" : "🎵 بدون عنوان");
 
-    db.push({
+    db.unshift({
         title,
         messageId: msg.message_id
     });
