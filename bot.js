@@ -42,12 +42,12 @@ async function isMember(userId) {
 
 // ---------- KEYBOARD ----------
 function getKeyboard(page = 0) {
-    const db = loadDB().slice().reverse(); // ✅ فقط یک بار
+    const db = loadDB();
 
     const start = page * PAGE_SIZE;
     const end = start + PAGE_SIZE;
 
-    const items = db.slice(start, end);
+    const items = db.slice().reverse().slice(start, end);
 
     const buttons = [];
 
