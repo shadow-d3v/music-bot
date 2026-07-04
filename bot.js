@@ -1,13 +1,15 @@
 import { Telegraf, Markup } from "telegraf";
 import fs from "fs";
+import dotenv from "dotenv";
+dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // 👑 ادمین
-const ADMIN_ID = 6364932669;
+const ADMIN_ID = Number(process.env.ADMIN_ID);
 
 // 📢 کانال اجباری
-const CHANNEL_USERNAME = "@PainxSorrow";
+const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
 
 const DB_FILE = "./db.json";
 const PAGE_SIZE = 7;
@@ -41,8 +43,11 @@ async function isMember(userId) {
 }
 
 // ---------- KEYBOARD ----------
+function getDB() {
+    return loadDB().slice().reverse();
+}
 function getKeyboard(page = 0) {
-    const db = loadDB().slice().reverse(); // ✅ فقط یک بار
+    const db = getDB();
 
     const start = page * PAGE_SIZE;
     const end = start + PAGE_SIZE;
@@ -205,7 +210,7 @@ bot.action(/^song_(\d+)$/, async (ctx) => {
     const ok = await isMember(ctx.from.id);
     if (!ok) return ctx.answerCbQuery("❌ عضو کانال نیستی");
 
-    const db = loadDB();
+    const db = getDB();
     const song = db[Number(ctx.match[1])];
 
     if (!song) return ctx.answerCbQuery("یافت نشد");
